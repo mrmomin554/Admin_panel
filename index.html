@@ -458,6 +458,49 @@ button:hover {
     color: #ffcc66;
     margin-top: 3px;
 }
+
+.reset-section {
+    background: rgba(153, 0, 51, 0.2);
+    border: 1px solid #ff3366;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+.reset-section h3 {
+    color: #ff3366;
+    margin-bottom: 10px;
+}
+
+.danger-zone {
+    background: rgba(255, 0, 0, 0.2);
+    border: 2px solid #ff0000;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px 0;
+    animation: dangerPulse 2s infinite alternate;
+}
+
+@keyframes dangerPulse {
+    0% { box-shadow: 0 0 10px rgba(255, 0, 0, 0.3); }
+    100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.6); }
+}
+
+.danger-zone h3 {
+    color: #ff0000;
+    margin-bottom: 10px;
+}
+
+.danger-btn {
+    background: linear-gradient(145deg, #cc0000, #ff0000);
+    border: 1px solid #ff6666;
+}
+
+.danger-btn:hover {
+    background: linear-gradient(145deg, #ff0000, #ff3333);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 0, 0, 0.8);
+}
 </style>
 </head>
 <body>
@@ -581,6 +624,40 @@ button:hover {
     </div>
 </div>
 
+<!-- Reset Section -->
+<div class="panel-section reset-section">
+    <h2>🔄 ডেটা রিসেট সিস্টেম</h2>
+    
+    <div class="input-group">
+        <label>নির্দিষ্ট ইউজার রিসেট</label>
+        <input type="text" id="resetUserId" placeholder="রিসেট করার ইউজার ID">
+        <button class="btn-refresh" onclick="resetSingleUser()"><i class="fas fa-user-slash"></i> ইউজার রিসেট করুন</button>
+    </div>
+    
+    <div class="danger-zone">
+        <h3>⚠️ ডেঞ্জার জোন - সতর্কতা!</h3>
+        <p>এই অপারেশনগুলো বিপরীতমুখী নয়। সব ডেটা চিরতরে ডিলিট হয়ে যাবে।</p>
+        
+        <div class="quick-actions">
+            <button class="danger-btn quick-action-btn" onclick="resetAllUserData()">
+                <i class="fas fa-bomb"></i> সব ইউজার ডেটা রিসেট
+            </button>
+            <button class="danger-btn quick-action-btn" onclick="clearAllData()">
+                <i class="fas fa-trash"></i> সব ডেটা ক্লিয়ার
+            </button>
+        </div>
+        
+        <div class="input-group">
+            <label>শুধুমাত্র 8-ডিজিট ইউজার দেখান</label>
+            <div class="quick-actions">
+                <button class="btn-refresh quick-action-btn" onclick="toggleUserFilter()">
+                    <i class="fas fa-filter"></i> <span id="filterText">8-ডিজিট ফিল্টার: ON</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Alert Box -->
 <div class="alert" id="alertBox"></div>
 
@@ -609,6 +686,7 @@ let userActivity = JSON.parse(localStorage.getItem(USER_ACTIVITY_KEY) || '{}');
 let blockedUsers = JSON.parse(localStorage.getItem(BLOCKED_USERS_KEY) || '{}');
 let timerBlockedUsers = JSON.parse(localStorage.getItem(TIMER_BLOCKED_USERS_KEY) || '{}');
 let adminLogs = JSON.parse(localStorage.getItem(ADMIN_LOGS_KEY) || '[]');
+let showOnly8DigitUsers = true;
 
 // DOM Elements
 const alertBox = document.getElementById('alertBox');
@@ -711,6 +789,11 @@ function loadUsers() {
     
     let users = Object.entries(userActivity);
     
+    // Apply 8-digit filter if enabled
+    if (showOnly8DigitUsers) {
+        users = users.filter(([userId, userData]) => /^\d{8}$/.test(userId));
+    }
+    
     // Apply search filter
     if (searchTerm) {
         users = users.filter(([userId, userData]) => 
@@ -768,12 +851,21 @@ function loadUsers() {
                      <button class="btn-timer-block" onclick="quickTimerBlock('${userId}')" title="টাইমার ব্লক"><i class="fas fa-clock"></i></button>` :
                     `<button class="btn-unblock" onclick="unblockUserById('${userId}')" title="আনব্লক করুন"><i class="fas fa-check"></i></button>`
                 }
+                <button class="btn-refresh" onclick="resetSingleUserById('${userId}')" title="রিসেট করুন"><i class="fas fa-redo"></i></button>
             </div>
         `;
         userList.appendChild(userItem);
     });
     
     addLog(`ইউজার লিস্ট লোড করা হয়েছে (মোট: ${users.length})`);
+}
+
+// Toggle user filter
+function toggleUserFilter() {
+    showOnly8DigitUsers = !showOnly8DigitUsers;
+    document.getElementById('filterText').textContent = `8-ডিজিট ফিল্টার: ${showOnly8DigitUsers ? 'ON' : 'OFF'}`;
+    loadUsers();
+    showAlert(`8-ডিজিট ফিল্টার ${showOnly8DigitUsers ? 'চালু' : 'বন্ধ'} করা হয়েছে`, 'info');
 }
 
 // Copy user ID
@@ -969,6 +1061,98 @@ function unblockAllUsers() {
     addLog('সব ইউজার আনব্লক করা হয়েছে');
     loadUsers();
     updateStatistics();
+}
+
+// Reset single user
+function resetSingleUser() {
+    const userId = document.getElementById('resetUserId').value.trim();
+    resetSingleUserById(userId);
+}
+
+// Reset single user by ID
+function resetSingleUserById(userId) {
+    if (!userId) {
+        showAlert('❌ ইউজার ID লিখুন!', 'error');
+        return;
+    }
+    
+    if (!confirm(`⚠️ ইউজার ${userId} এর সব ডেটা রিসেট করতে চান?`)) return;
+    
+    // Remove user from all data
+    if (userActivity[userId]) {
+        delete userActivity[userId];
+        localStorage.setItem(USER_ACTIVITY_KEY, JSON.stringify(userActivity));
+    }
+    
+    if (blockedUsers[userId]) {
+        delete blockedUsers[userId];
+        localStorage.setItem(BLOCKED_USERS_KEY, JSON.stringify(blockedUsers));
+    }
+    
+    if (timerBlockedUsers[userId]) {
+        delete timerBlockedUsers[userId];
+        localStorage.setItem(TIMER_BLOCKED_USERS_KEY, JSON.stringify(timerBlockedUsers));
+    }
+    
+    // Remove user messages
+    const userMessages = JSON.parse(localStorage.getItem(USER_MESSAGES_KEY) || '{}');
+    if (userMessages[userId]) {
+        delete userMessages[userId];
+        localStorage.setItem(USER_MESSAGES_KEY, JSON.stringify(userMessages));
+    }
+    
+    showAlert(`✅ ইউজার ${userId} এর সব ডেটা রিসেট করা হয়েছে!`, 'success');
+    addLog(`ইউজার রিসেট করা হয়েছে: ${userId}`);
+    loadUsers();
+    updateStatistics();
+    document.getElementById('resetUserId').value = '';
+}
+
+// Reset all user data
+function resetAllUserData() {
+    if (!confirm('⚠️ সব ইউজারের ডেটা রিসেট করতে চান? এটি বিপরীতমুখী নয়!')) return;
+    
+    // Clear all user-related data
+    localStorage.removeItem(USER_ACTIVITY_KEY);
+    localStorage.removeItem(BLOCKED_USERS_KEY);
+    localStorage.removeItem(TIMER_BLOCKED_USERS_KEY);
+    localStorage.removeItem(USER_MESSAGES_KEY);
+    
+    // Reset variables
+    userActivity = {};
+    blockedUsers = {};
+    timerBlockedUsers = {};
+    
+    showAlert('✅ সব ইউজার ডেটা রিসেট করা হয়েছে!', 'success');
+    addLog('সব ইউজার ডেটা রিসেট করা হয়েছে');
+    loadUsers();
+    updateStatistics();
+}
+
+// Clear all data (nuclear option)
+function clearAllData() {
+    if (!confirm('🚨 সব ডেটা চিরতরে ডিলিট করতে চান? এটি সম্পূর্ণ বিপরীতমুখী নয়!')) return;
+    if (!confirm('🚨 আপনি কি নিশ্চিত? সবকিছু ডিলিট হয়ে যাবে!')) return;
+    
+    // Clear all MR_TOOLS related data
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+        if (key.startsWith('mr_tools_')) {
+            localStorage.removeItem(key);
+        }
+    });
+    
+    // Reset all variables
+    userActivity = {};
+    blockedUsers = {};
+    timerBlockedUsers = {};
+    adminLogs = [];
+    
+    showAlert('✅ সব ডেটা ক্লিয়ার করা হয়েছে!', 'success');
+    addLog('সব ডেটা ক্লিয়ার করা হয়েছে');
+    loadUsers();
+    updateStatistics();
+    updateLogDisplay();
 }
 
 // Set maintenance message template
@@ -1180,4 +1364,4 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 </body>
-  </html>
+</html>
